@@ -18,6 +18,9 @@ import android.support.v4.app.ActivityCompat
 import android.support.v4.content.FileProvider
 import android.util.Log
 import java.io.File
+import android.content.ActivityNotFoundException
+import android.net.Uri
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -25,7 +28,11 @@ class MainActivity : AppCompatActivity() {
 
     val CAMERA_REQUEST_CODE = 0
 
+    val CROP_PIC = 2
+
     val timeStamp = "anything"
+
+    lateinit var fileName : String
 
     companion object {
         const val REQUEST_PERMISSION = 1
@@ -53,9 +60,9 @@ class MainActivity : AppCompatActivity() {
         options.inPreferredConfig = Bitmap.Config.ARGB_8888
 
         val bitmap = BitmapFactory.decodeFile(photoPath, options)
-        if (photoPath != null) {
-            image_capture.setImageBitmap(bitmap)
-        }
+//        if (photoPath != null) {
+//            image_capture.setImageBitmap(bitmap)
+//        }
 
         take_camera.setOnClickListener {
             handleRequestCamera()
@@ -68,11 +75,14 @@ class MainActivity : AppCompatActivity() {
 
         when(requestCode) {
             CAMERA_REQUEST_CODE -> {
-
                 if (resultCode == Activity.RESULT_OK) {
-                    image_capture.setImageBitmap(setScaledBitmap())
+                    performCrop(Uri.fromFile(File(fileName)))
                 }
-            } else -> {
+            }
+            CROP_PIC -> {
+                image_capture.setImageBitmap(setScaledBitmap())
+            }
+            else -> {
                 Toast.makeText(this, "Unrecognized request code", Toast.LENGTH_SHORT).show()
             }
         }
@@ -106,6 +116,7 @@ class MainActivity : AppCompatActivity() {
         Log.i(TAG,"imageFileName: " + imageFileName)
         Log.i(TAG,"name: " + imageFile.name)
         Log.i(TAG,"absolutePath: " + imageFile.absolutePath)
+        fileName = imageFile.absolutePath
         return imageFile
     }
 
@@ -124,7 +135,36 @@ class MainActivity : AppCompatActivity() {
         bmOptions.inJustDecodeBounds = false
         bmOptions.inSampleSize = scaleFactor
 
+
         return BitmapFactory.decodeFile(imageFilePath, bmOptions)
 
+    }
+
+    private fun performCrop(uri : Uri) {
+        // take care of exceptions
+        try {
+            // call the standard crop action intent (the user device may not
+            // support it)
+            val cropIntent = Intent("com.android.camera.action.CROP")
+            // indicate image type and Uri
+            cropIntent.setDataAndType(uri, "image/*")
+            // set crop properties
+            cropIntent.putExtra("crop", "true")
+            // indicate aspect of desired crop
+            cropIntent.putExtra("aspectX", 2)
+            cropIntent.putExtra("aspectY", 2)
+            // indicate output X and Y
+            cropIntent.putExtra("outputX", 256)
+            cropIntent.putExtra("outputY", 256)
+            // retrieve data on return
+            cropIntent.putExtra("return-data", true)
+            // start the activity - we handle returning in onActivityResult
+            startActivityForResult(cropIntent, CROP_PIC)
+        } catch (anfe: ActivityNotFoundException) {
+            val toast = Toast
+                    .makeText(this, "This device doesn't support the crop action!", Toast.LENGTH_SHORT)
+            toast.show()
+        }
+        // respond to users whose devices do not support the crop action
     }
 }
